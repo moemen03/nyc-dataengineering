@@ -61,51 +61,49 @@ export const CollisionMap = ({ data }: CollisionMapProps) => {
       className="h-full w-full rounded-lg"
       style={{ minHeight: "500px" }}
     >
-      <>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <MapUpdater data={mapData} />
-        {mapData.map((collision, idx) => {
-          const position: LatLngExpression = [collision.LATITUDE, collision.LONGITUDE];
-          return (
-            <CircleMarker
-              key={`${collision.COLLISION_ID}-${idx}`}
-              center={position}
-              pathOptions={{
-                fillColor: getColorBySeverity(
-                  collision.NUMBER_OF_PERSONS_INJURED,
-                  collision.NUMBER_OF_PERSONS_KILLED
-                ),
-                color: "#fff",
-                weight: 1,
-                opacity: 0.8,
-                fillOpacity: 0.6,
-              }}
-              radius={5}
-            >
-              <Popup>
-                <div className="text-sm">
-                  <strong>
-                    {collision.BOROUGH || "Unknown"} -{" "}
-                    {collision.CRASH_DATE ? new Date(collision.CRASH_DATE).toLocaleDateString() : "N/A"}
-                  </strong>
-                  <br />
-                  <span className="text-xs">
-                    Injured: {collision.NUMBER_OF_PERSONS_INJURED} | Killed:{" "}
-                    {collision.NUMBER_OF_PERSONS_KILLED}
-                  </span>
-                  <br />
-                  <span className="text-xs text-muted-foreground">
-                    {collision.CONTRIBUTING_FACTOR_VEHICLE_1 || "Unknown cause"}
-                  </span>
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
-      </>
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <MapUpdater data={mapData} />
+      {mapData.map((collision, idx) => {
+        const position: LatLngExpression = [collision.LATITUDE, collision.LONGITUDE];
+        return (
+          <CircleMarker
+            key={`${collision.COLLISION_ID}-${idx}`}
+            center={position}
+            pathOptions={{
+              fillColor: getColorBySeverity(
+                collision.NUMBER_OF_PERSONS_INJURED,
+                collision.NUMBER_OF_PERSONS_KILLED
+              ),
+              color: "#fff",
+              weight: 1,
+              opacity: 0.8,
+              fillOpacity: 0.6,
+            }}
+            radius={5}
+          >
+            <Popup>
+              <div className="text-sm">
+                <strong>
+                  {collision.BOROUGH || "Unknown"} -{" "}
+                  {collision.CRASH_DATE ? new Date(collision.CRASH_DATE).toLocaleDateString() : "N/A"}
+                </strong>
+                <br />
+                <span className="text-xs">
+                  Injured: {collision.NUMBER_OF_PERSONS_INJURED} | Killed:{" "}
+                  {collision.NUMBER_OF_PERSONS_KILLED}
+                </span>
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  {collision.CONTRIBUTING_FACTOR_VEHICLE_1 || "Unknown cause"}
+                </span>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
     </MapContainer>
   );
 };
