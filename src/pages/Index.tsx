@@ -1,10 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { AlertCircle, TrendingUp, Users, Activity } from "lucide-react";
+import { AlertCircle, TrendingUp, Users, Activity, Map, BarChart3 } from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { FilterSidebar } from "@/components/FilterSidebar";
 import { ChartCard } from "@/components/ChartCard";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { CollisionMap } from "@/components/CollisionMap";
+import { HeatmapCalendar } from "@/components/HeatmapCalendar";
+import { TrendAnalysis } from "@/components/TrendAnalysis";
+import { ExportButton } from "@/components/ExportButton";
 import { loadCollisionData, CollisionData } from "@/lib/dataLoader";
 import { useToast } from "@/hooks/use-toast";
+import { DateRange } from "react-day-picker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart,
   Bar,
@@ -19,6 +27,8 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
+  PieChart,
+  Pie,
 } from "recharts";
 
 const Index = () => {
@@ -29,6 +39,8 @@ const Index = () => {
   const [selectedVehicle, setSelectedVehicle] = useState("All");
   const [selectedFactor, setSelectedFactor] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [activeTab, setActiveTab] = useState("charts");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -113,9 +125,17 @@ const Index = () => {
       if (processedFilters.year !== "All" && d.YEAR.toString() !== processedFilters.year) return false;
       if (selectedVehicle !== "All" && d.VEHICLE_TYPE_CODE_1 !== selectedVehicle) return false;
       if (selectedFactor !== "All" && d.CONTRIBUTING_FACTOR_VEHICLE_1 !== selectedFactor) return false;
+      
+      // Date range filter
+      if (dateRange?.from || dateRange?.to) {
+        const crashDate = new Date(d.CRASH_DATE);
+        if (dateRange.from && crashDate < dateRange.from) return false;
+        if (dateRange.to && crashDate > dateRange.to) return false;
+      }
+      
       return true;
     });
-  }, [data, processedFilters, selectedVehicle, selectedFactor]);
+  }, [data, processedFilters, selectedVehicle, selectedFactor, dateRange]);
 
   // Calculate metrics
   const metrics = useMemo(() => {
@@ -209,6 +229,32 @@ const Index = () => {
       };
     });
 
+    // Severity distribution for pie chart
+    const severityData = [
+      {
+        name: "Property Damage Only",
+        value: filteredData.filter(
+          (d) => d.NUMBER_OF_PERSONS_INJURED === 0 && d.NUMBER_OF_PERSONS_KILLED === 0
+        ).length,
+      },
+      {
+        name: "Minor Injuries",
+        value: filteredData.filter(
+          (d) => d.NUMBER_OF_PERSONS_INJURED > 0 && d.NUMBER_OF_PERSONS_INJURED <= 2 && d.NUMBER_OF_PERSONS_KILLED === 0
+        ).length,
+      },
+      {
+        name: "Major Injuries",
+        value: filteredData.filter(
+          (d) => d.NUMBER_OF_PERSONS_INJURED > 2 && d.NUMBER_OF_PERSONS_KILLED === 0
+        ).length,
+      },
+      {
+        name: "Fatal",
+        value: filteredData.filter((d) => d.NUMBER_OF_PERSONS_KILLED > 0).length,
+      },
+    ];
+
     return {
       boroughCounts,
       yearCounts,
@@ -217,10 +263,12 @@ const Index = () => {
       factorCounts,
       vehicleCounts,
       casualties,
+      severityData,
     };
   }, [filteredData]);
 
   const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+  const SEVERITY_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-3))", "hsl(var(--accent))", "hsl(var(--destructive))"];
 
   if (loading) {
     return (
@@ -236,18 +284,33 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="gradient-primary text-white py-8 px-6 shadow-elevated">
-        <div className="container mx-auto">
-          <h1 className="text-4xl md:text-5xl font-bold mb-2">NYC Motor Vehicle Collisions</h1>
-          <p className="text-lg text-white/90">
+      <header className="gradient-primary text-white py-8 px-6 shadow-elevated relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"></div>
+        <div className="container mx-auto relative z-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 animate-fade-in">
+              <div className="p-3 bg-white/10 rounded-xl backdrop-blur">
+                <BarChart3 className="w-8 h-8" />
+              </div>
+              <div>
+                <h1 className="text-4xl md:text-5xl font-bold">NYC Collisions Analytics</h1>
+                <p className="text-sm text-white/80 mt-1">Advanced Traffic Intelligence Platform</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <ExportButton data={filteredData} />
+              <ThemeToggle />
+            </div>
+          </div>
+          <p className="text-lg text-white/90 animate-fade-in-up">
             Comprehensive analysis of traffic incidents across New York City (2012-2025)
           </p>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-6 py-8" id="dashboard-content">
         {/* Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 animate-fade-in">
           <MetricCard
             title="Total Crashes"
             value={metrics.totalCrashes.toLocaleString()}
@@ -277,7 +340,7 @@ const Index = () => {
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 animate-slide-in-right">
             <FilterSidebar
               boroughs={filterOptions.boroughs}
               years={filterOptions.years}
@@ -295,10 +358,27 @@ const Index = () => {
               onSearchChange={setSearchQuery}
               onSearch={() => {}}
             />
+            
+            {/* Date Range Picker */}
+            <div className="mt-6">
+              <ChartCard title="Date Range Filter" className="p-4">
+                <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+              </ChartCard>
+            </div>
           </div>
 
           {/* Charts */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="lg:col-span-3 space-y-6 animate-fade-in-up">
+            {/* Tabs for different views */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-4 mb-6">
+                <TabsTrigger value="charts">Charts</TabsTrigger>
+                <TabsTrigger value="map">Map View</TabsTrigger>
+                <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
+                <TabsTrigger value="trends">Trends</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="charts" className="space-y-6">
             {/* Row 1 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <ChartCard title="Crashes by Borough">
@@ -397,27 +477,116 @@ const Index = () => {
             </div>
 
             {/* Row 4 */}
-            <ChartCard title="Casualties by Borough">
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={chartData.casualties}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="injured" fill="hsl(var(--chart-3))" radius={[8, 8, 0, 0]} name="Injured" />
-                  <Bar dataKey="killed" fill="hsl(var(--destructive))" radius={[8, 8, 0, 0]} name="Killed" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ChartCard title="Casualties by Borough">
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={chartData.casualties}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="injured" fill="hsl(var(--chart-3))" radius={[8, 8, 0, 0]} name="Injured" />
+                    <Bar dataKey="killed" fill="hsl(var(--destructive))" radius={[8, 8, 0, 0]} name="Killed" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Collision Severity Distribution">
+                <ResponsiveContainer width="100%" height={350}>
+                  <PieChart>
+                    <Pie
+                      data={chartData.severityData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {chartData.severityData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[index % SEVERITY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+              </TabsContent>
+
+              {/* Map Tab */}
+              <TabsContent value="map">
+                <ChartCard title="Collision Locations" className="h-[600px]">
+                  <CollisionMap data={filteredData} />
+                </ChartCard>
+              </TabsContent>
+
+              {/* Heatmap Tab */}
+              <TabsContent value="heatmap">
+                <ChartCard title="Collision Patterns: Day vs Hour">
+                  <HeatmapCalendar data={filteredData} />
+                </ChartCard>
+              </TabsContent>
+
+              {/* Trends Tab */}
+              <TabsContent value="trends" className="space-y-6">
+                <ChartCard title="Trend Analysis & Predictions">
+                  <TrendAnalysis data={filteredData} />
+                </ChartCard>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ChartCard title="Year-over-Year Comparison">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={chartData.yearCounts}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="hsl(var(--chart-2))"
+                          strokeWidth={3}
+                          dot={{ fill: "hsl(var(--chart-2))", r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  <ChartCard title="Borough Comparison">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={chartData.boroughCounts}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {chartData.boroughCounts.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="bg-card border-t border-border mt-16 py-6">
-        <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>Data Source: NYC Open Data | Built with React, TypeScript & Recharts</p>
+      <footer className="gradient-primary text-white mt-16 py-8 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+        <div className="container mx-auto px-6 text-center relative z-10">
+          <p className="text-sm text-white/90 mb-2">
+            Data Source: NYC Open Data | Built with React, TypeScript, Recharts & Leaflet
+          </p>
+          <p className="text-xs text-white/70">
+            Advanced Analytics Platform for Traffic Safety Research
+          </p>
         </div>
       </footer>
     </div>
